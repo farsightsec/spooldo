@@ -12,7 +12,7 @@ class CommandTemplate(string.Template):
 
 def run_cmd(cmd):
     sys.stderr.write(cmd + '\n')
-    os.system(cmd)
+    return os.system(cmd)
 
 def dirwalk(dirname):
     file_list = []
@@ -49,7 +49,10 @@ def do_spool(incoming_dname, active_dname, archive_dname=None, cmd_tmpl=None):
             warn('unable to link %s to %s' % (incoming_fname, active_fname))
 
         if cmd_tmpl:
-            run_cmd(CommandTemplate(cmd_tmpl).safe_substitute(fname=active_fname))
+            rc = run_cmd(CommandTemplate(cmd_tmpl).substitute(fname=active_fname))
+            if rc != 0:
+                os.unlink(active_fname)
+                error('command failed')
 
         os.unlink(incoming_fname)
 
