@@ -11,7 +11,7 @@ class CommandTemplate(string.Template):
     delimiter = '%'
 
 def run_cmd(cmd):
-    sys.stdout.write(cmd + '\n')
+    sys.stderr.write(cmd + '\n')
     os.system(cmd)
 
 def dirwalk(dirname):
