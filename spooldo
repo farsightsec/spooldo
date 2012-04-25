@@ -22,7 +22,10 @@ def dirwalk(dirname):
                 continue
             fname = os.path.join(root, fname)
             file_list.append(fname)
-    random.shuffle(file_list)
+    if os.getenv('SPOOLDO_ORDERED'):
+        file_list.sort()
+    else:
+        random.shuffle(file_list)
     return file_list
 
 def same_filesystem(fname1, fname2):
