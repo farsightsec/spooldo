@@ -47,10 +47,11 @@ def do_spool(incoming_dname, active_dname, archive_dname=None, cmd_tmpl=None):
             os.link(incoming_fname, active_fname)
         except:
             warn('unable to link %s to %s' % (incoming_fname, active_fname))
-        os.unlink(incoming_fname)
 
         if cmd_tmpl:
             run_cmd(CommandTemplate(cmd_tmpl).safe_substitute(fname=active_fname))
+
+        os.unlink(incoming_fname)
 
 def warn(msg):
     sys.stderr.write('spooldo: warning: %s\n' % msg)
