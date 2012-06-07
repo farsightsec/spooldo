@@ -1,0 +1,22 @@
+spooldo: spool directory processing utility
+-------------------------------------------
+
+spooldo is a script for continuously processing the files that accumulate in
+a directory.
+
+It takes three parameters on the command line: the "incoming" directory, the
+"active" directory, and the "archive" directory. The incoming and active
+directories are required; the archive directory is optional. spooldo
+continuously links new files in the incoming directory into the active
+directory, and then unlinks them from the incoming directory.
+
+If an archive directory is specified, new files will also be linked (or, if
+the archive directory is on another filesystem, copied) into it.
+
+If the SPOOLDO_COMMAND_TEMPLATE environment variable is set, this value will
+be used to construct a command that will be executed for each file as it
+passes through the "active" directory. The sequence "%fname" in the command
+template will be converted to the path to the file to be processed.
+
+If the SPOOLDO_ORDERED environment variable is set, files in the incoming
+directory will be processed in sorted order.
