@@ -85,10 +85,9 @@ def main(incoming_dname, active_dname, archive_dname=None):
     active_dname = os.path.realpath(active_dname)
 
     if not os.path.isdir(incoming_dname):
-        error('"%s" is not a directory.')
-        sys.exit(1)
+        error('"%s" is not a directory.' % incoming_dname)
     if not os.path.isdir(active_dname):
-        error('"%s" is not a directory.')
+        error('"%s" is not a directory.' % active_dname)
 
     if not same_filesystem(incoming_dname, active_dname):
         error('incoming directory and active directory are not on the same filesystem.')
@@ -97,7 +96,7 @@ def main(incoming_dname, active_dname, archive_dname=None):
         archive_dname = os.path.realpath(archive_dname)
 
         if not os.path.isdir(archive_dname):
-            error('"%s" is not a directory.')
+            error('"%s" is not a directory.' % archive_dname)
 
         if os.path.samefile(incoming_dname, archive_dname):
             error('incoming directory and archive directory are the same.')
