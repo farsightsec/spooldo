@@ -1,0 +1,15 @@
+Source: spooldo
+Section: utils
+Priority: optional
+Maintainer: Robert S. Edmonds <edmonds@debian.org>
+Build-Depends:
+ dpkg-dev (>= 1.16.0~),
+ debhelper (>= 8~)
+Standards-Version: 3.9.3
+
+Package: spooldo
+Architecture: all
+Depends: ${misc:Depends},
+ python
+Description: spooldo utility
+ spooldo utility
