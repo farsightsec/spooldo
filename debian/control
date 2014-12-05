@@ -9,6 +9,8 @@ Standards-Version: 3.9.3
 
 Package: spooldo
 Architecture: all
+Conflicts: isc-spooldo
+Replaces: isc-spooldo
 Depends: ${misc:Depends},
  python
 Description: spooldo utility
