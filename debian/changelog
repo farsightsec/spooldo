@@ -1,5 +1,5 @@
-spooldo (0.4-2) debian-farsightsec; urgency=medium
+spooldo (0.5.0-1) debian-farsightsec; urgency=medium
 
   * Current release.
 
- -- Robert Edmonds <edmonds@fsi.io>  Fri, 05 Dec 2014 13:03:32 -0500
+ -- Robert Edmonds <edmonds@fsi.io>  Fri, 05 Dec 2014 13:10:20 -0500
