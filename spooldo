@@ -53,13 +53,6 @@ def do_spool(incoming_dname, active_dname, archive_dname=None, cmd_tmpl=None):
         fname = rel_fname.replace(os.path.sep, '--')
         active_fname = os.path.join(active_dname, fname)
 
-        if archive_dname:
-            archive_fname = os.path.join(archive_dname, fname)
-            if same_filesystem(incoming_dname, archive_dname):
-                os.link(incoming_fname, archive_fname)
-            else:
-                shutil.copy(incoming_fname, archive_fname)
-
         try:
             os.link(incoming_fname, active_fname)
         except:
@@ -71,7 +64,15 @@ def do_spool(incoming_dname, active_dname, archive_dname=None, cmd_tmpl=None):
                 os.unlink(active_fname)
                 error('command failed')
 
-        os.unlink(incoming_fname)
+        try:
+            if archive_dname:
+                archive_fname = os.path.join(archive_dname, fname)
+                if same_filesystem(incoming_dname, archive_dname):
+                    os.link(incoming_fname, archive_fname)
+                else:
+                    shutil.copy(incoming_fname, archive_fname)
+        finally:
+            os.unlink(incoming_fname)
 
 def warn(msg):
     sys.stderr.write('spooldo: warning: %s\n' % msg)
