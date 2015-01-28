@@ -1,3 +1,9 @@
+spooldo (0.6.0-1) debian-farsightsec; urgency=medium
+
+  * Move archive after processing to avoid infinite archiving loop
+
+ -- Henry Stern <stern@fsi.io>  Wed, 28 Jan 2015 13:16:07 -0400
+
 spooldo (0.5.0-1) debian-farsightsec; urgency=medium
 
   * Current release.
