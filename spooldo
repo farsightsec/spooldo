@@ -47,7 +47,7 @@ def same_filesystem(fname1, fname2):
         return True
     return False
 
-def do_spool(incoming_dname, active_dname, archive_dname=None, cmd_tmpl=None):
+def do_spool(incoming_dname, active_dname, archive_dnames=[], cmd_tmpl=None):
     for incoming_fname in dirwalk(incoming_dname):
         rel_fname = os.path.relpath(incoming_fname, incoming_dname)
         fname = rel_fname.replace(os.path.sep, '--')
@@ -65,12 +65,13 @@ def do_spool(incoming_dname, active_dname, archive_dname=None, cmd_tmpl=None):
                 error('command failed')
 
         try:
-            if archive_dname:
-                archive_fname = os.path.join(archive_dname, fname)
-                if same_filesystem(incoming_dname, archive_dname):
-                    os.link(incoming_fname, archive_fname)
-                else:
-                    shutil.copy(incoming_fname, archive_fname)
+            if archive_dnames:
+                for archive_dname in archive_dnames:
+                    archive_fname = os.path.join(archive_dname, fname)
+                    if same_filesystem(incoming_dname, archive_dname):
+                        os.link(incoming_fname, archive_fname)
+                    else:
+                        shutil.copy(incoming_fname, archive_fname)
         finally:
             os.unlink(incoming_fname)
 
@@ -81,7 +82,7 @@ def error(msg):
     sys.stderr.write('spooldo: error: %s\n' % msg)
     sys.exit(1)
 
-def main(incoming_dname, active_dname, archive_dname=None):
+def main(incoming_dname, active_dname, archive_dnames=[]):
     incoming_dname = os.path.realpath(incoming_dname)
     active_dname = os.path.realpath(active_dname)
 
@@ -93,16 +94,17 @@ def main(incoming_dname, active_dname, archive_dname=None):
     if not same_filesystem(incoming_dname, active_dname):
         error('incoming directory and active directory are not on the same filesystem.')
 
-    if archive_dname:
-        archive_dname = os.path.realpath(archive_dname)
+    if archive_dnames:
+        for archive_dname in archive_dnames:
+            archive_dname = os.path.realpath(archive_dname)
 
-        if not os.path.isdir(archive_dname):
-            error('"%s" is not a directory.' % archive_dname)
+            if not os.path.isdir(archive_dname):
+                error('"%s" is not a directory.' % archive_dname)
 
-        if os.path.samefile(incoming_dname, archive_dname):
-            error('incoming directory and archive directory are the same.')
-        if os.path.samefile(active_dname, archive_dname):
-            error('active directory and archive directory are the same.')
+            if os.path.samefile(incoming_dname, archive_dname):
+                error('incoming directory and archive directory are the same.')
+            if os.path.samefile(active_dname, archive_dname):
+                error('active directory and archive directory are the same.')
 
     if os.path.samefile(incoming_dname, active_dname):
         error('incoming directory and active directory are the same.')
@@ -111,7 +113,7 @@ def main(incoming_dname, active_dname, archive_dname=None):
 
     while True:
         try:
-            do_spool(incoming_dname, active_dname, archive_dname, cmd_tmpl)
+            do_spool(incoming_dname, active_dname, archive_dnames, cmd_tmpl)
         except:
             pass
         time.sleep(1)
@@ -119,8 +121,8 @@ def main(incoming_dname, active_dname, archive_dname=None):
 if __name__ == '__main__':
     if len(sys.argv) == 3:
         main(sys.argv[1], sys.argv[2])
-    elif len(sys.argv) == 4:
-        main(sys.argv[1], sys.argv[2], sys.argv[3])
+    elif len(sys.argv) > 3:
+        main(sys.argv[1], sys.argv[2], sys.argv[3:])
     else:
-        sys.stderr.write('Usage: %s <INCOMING DIR> <ACTIVE DIR> [<ARCHIVE DIR>]\n' % sys.argv[0])
+        sys.stderr.write('Usage: %s <INCOMING DIR> <ACTIVE DIR> [<ARCHIVE DIR> ... <ARCHIVE DIR>]\n' % sys.argv[0])
         sys.exit(1)
