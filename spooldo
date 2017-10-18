@@ -47,6 +47,17 @@ def same_filesystem(fname1, fname2):
         return True
     return False
 
+def archive_incoming(incoming_fname, fname, archive_dnames=[]):
+    try:
+        for archive_dname in archive_dnames:
+            archive_fname = os.path.join(archive_dname, fname)
+            if same_filesystem(incoming_fname, archive_dname):
+                os.link(incoming_fname, archive_fname)
+            else:
+                shutil.copy(incoming_fname, archive_fname)
+    finally:
+        os.unlink(incoming_fname)
+
 def do_spool(incoming_dname, active_dname, archive_dnames=[], cmd_tmpl=None):
     for incoming_fname in dirwalk(incoming_dname):
         rel_fname = os.path.relpath(incoming_fname, incoming_dname)
@@ -64,16 +75,7 @@ def do_spool(incoming_dname, active_dname, archive_dnames=[], cmd_tmpl=None):
                 os.unlink(active_fname)
                 error('command failed')
 
-        try:
-            if archive_dnames:
-                for archive_dname in archive_dnames:
-                    archive_fname = os.path.join(archive_dname, fname)
-                    if same_filesystem(incoming_dname, archive_dname):
-                        os.link(incoming_fname, archive_fname)
-                    else:
-                        shutil.copy(incoming_fname, archive_fname)
-        finally:
-            os.unlink(incoming_fname)
+        archive_incoming(incoming_fname, fname, archive_dnames)
 
 def warn(msg):
     sys.stderr.write('spooldo: warning: %s\n' % msg)
