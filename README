@@ -18,5 +18,8 @@ be used to construct a command that will be executed for each file as it
 passes through the "active" directory. The sequence "%fname" in the command
 template will be converted to the path to the file to be processed.
 
+If the SPOOLDO_JOBS environment variable is set to a positive integer,
+spooldo will run up to the given number of commands concurrently.
+
 If the SPOOLDO_ORDERED environment variable is set, files in the incoming
 directory will be processed in sorted order.
