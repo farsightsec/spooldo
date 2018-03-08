@@ -74,6 +74,8 @@ def do_spool(incoming_dname, active_dname, archive_dnames=[], cmd_tmpl=None):
     jobs = dict()
     try:
         limit = int(os.getenv("SPOOLDO_JOBS"))
+        if limit < 1:
+            limit = 1
     except:
         limit = 1
     try:
