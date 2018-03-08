@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import os
+import subprocess
 import random
 import shutil
 import string
@@ -24,9 +25,20 @@ import time
 class CommandTemplate(string.Template):
     delimiter = '%'
 
-def run_cmd(cmd):
+def start_job(cmd):
     sys.stderr.write(cmd + '\n')
-    return os.system(cmd)
+    return subprocess.Popen(cmd, shell=True).pid
+
+def waitproc(jobs):
+    (pid, status) = os.wait()
+    if pid in jobs:
+        incoming_fname, active_fname, fname, archive_dnames = jobs[pid]
+        if status != 0:
+            error('command failed')
+            os.unlink(active_fname)
+        archive_incoming(incoming_fname, fname, archive_dnames)
+        del jobs[pid]
+        sys.stderr.write('%s done\n' % active_fname)
 
 def dirwalk(dirname):
     file_list = []
@@ -59,23 +71,35 @@ def archive_incoming(incoming_fname, fname, archive_dnames=[]):
         os.unlink(incoming_fname)
 
 def do_spool(incoming_dname, active_dname, archive_dnames=[], cmd_tmpl=None):
-    for incoming_fname in dirwalk(incoming_dname):
-        rel_fname = os.path.relpath(incoming_fname, incoming_dname)
-        fname = rel_fname.replace(os.path.sep, '--')
-        active_fname = os.path.join(active_dname, fname)
+    jobs = dict()
+    try:
+        limit = int(os.getenv("SPOOLDO_JOBS"))
+    except:
+        limit = 1
+    try:
+        for incoming_fname in dirwalk(incoming_dname):
+            rel_fname = os.path.relpath(incoming_fname, incoming_dname)
+            fname = rel_fname.replace(os.path.sep, '--')
+            active_fname = os.path.join(active_dname, fname)
 
-        try:
-            os.link(incoming_fname, active_fname)
-        except:
-            warn('unable to link %s to %s' % (incoming_fname, active_fname))
+            try:
+                if os.path.isfile(active_fname):
+                    continue
+                os.link(incoming_fname, active_fname)
+            except:
+                warn('unable to link %s to %s' % (incoming_fname, active_fname))
+                continue
 
-        if cmd_tmpl:
-            rc = run_cmd(CommandTemplate(cmd_tmpl).substitute(fname=active_fname))
-            if rc != 0:
-                os.unlink(active_fname)
-                error('command failed')
-
-        archive_incoming(incoming_fname, fname, archive_dnames)
+            if cmd_tmpl:
+                pid = start_job(CommandTemplate(cmd_tmpl).substitute(fname=active_fname))
+                jobs[pid] = (incoming_fname, active_fname, fname, archive_dnames)
+                if len(jobs) == limit:
+                        waitproc(jobs)
+            else:
+                archive_incoming(incoming_fname, fname, archive_dnames)
+    finally:
+        while len(jobs) > 0:
+            waitproc(jobs)
 
 def warn(msg):
     sys.stderr.write('spooldo: warning: %s\n' % msg)
