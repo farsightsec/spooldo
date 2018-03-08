@@ -34,8 +34,10 @@ def waitproc(jobs):
     if pid in jobs:
         incoming_fname, active_fname, fname, archive_dnames = jobs[pid]
         if status != 0:
-            error('command failed')
-            os.unlink(active_fname)
+            try:
+                os.unlink(active_fname)
+            finally:
+                error('command failed')
         archive_incoming(incoming_fname, fname, archive_dnames)
         del jobs[pid]
         sys.stderr.write('%s done\n' % active_fname)
