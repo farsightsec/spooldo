@@ -160,8 +160,10 @@ def main(incoming_dname, active_dname, archive_dnames=[]):
     while True:
         try:
             spooldo.do_spool()
-        except:
+        except Exception:
             pass
+        except SystemExit:
+            raise
         time.sleep(1)
 
 if __name__ == '__main__':
