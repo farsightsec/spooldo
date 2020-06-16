@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import os
-import subprocess
 import random
 import shutil
 import string
@@ -25,22 +24,10 @@ import time
 class CommandTemplate(string.Template):
     delimiter = '%'
 
-def start_job(cmd):
-    sys.stderr.write(cmd + '\n')
-    return subprocess.Popen(cmd, shell=True).pid
-
-def waitproc(jobs):
-    (pid, status) = os.wait()
-    if pid in jobs:
-        incoming_fname, active_fname, fname, archive_dnames = jobs[pid]
-        if status != 0:
-            try:
-                os.unlink(active_fname)
-            finally:
-                error('command failed')
-        archive_incoming(incoming_fname, fname, archive_dnames)
-        del jobs[pid]
-        sys.stderr.write('%s done\n' % active_fname)
+def same_filesystem(fname1, fname2):
+    if os.stat(fname1).st_dev == os.stat(fname2).st_dev:
+        return True
+    return False
 
 def dirwalk(dirname):
     file_list = []
@@ -56,54 +43,110 @@ def dirwalk(dirname):
         random.shuffle(file_list)
     return file_list
 
-def same_filesystem(fname1, fname2):
-    if os.stat(fname1).st_dev == os.stat(fname2).st_dev:
-        return True
-    return False
+class Spooldo:
+    def __init__(self, incoming_dname, active_dname, *archive_dnames):
+        self.incoming_dname = incoming_dname
+        self.active_dname = active_dname
+        self.archive_dnames = archive_dnames
 
-def archive_incoming(incoming_fname, fname, archive_dnames=[]):
-    try:
-        for archive_dname in archive_dnames:
+        self.active_files = set()
+        self.active_files_by_pid = dict()
+
+        cmd_tmpl = os.getenv("SPOOLDO_COMMAND_TEMPLATE")
+        if cmd_tmpl:
+            self.cmd_tmpl = CommandTemplate(cmd_tmpl)
+        else:
+            self.cmd_tmpl = None
+
+        self.max_jobs = 1
+        try:
+            jobs = int(os.getenv("SPOOLDO_JOBS"))
+            if jobs >= 1:
+                self.max_jobs = jobs
+        except:
+            pass
+
+    def run_cmd(self, active_fname):
+        cmd = self.cmd_tmpl.substitute(fname=active_fname)
+        sys.stderr.write(cmd + '\n')
+        rc = os.system(cmd)
+        if rc != 0:
+            try:
+                os.unlink(active_fname)
+            finally:
+                error('command failed')
+
+    def archive_incoming(self, incoming_fname, fname):
+        for archive_dname in self.archive_dnames:
             archive_fname = os.path.join(archive_dname, fname)
-            if same_filesystem(incoming_fname, archive_dname):
-                os.link(incoming_fname, archive_fname)
-            else:
-                shutil.copy(incoming_fname, archive_fname)
-    finally:
+            try:
+                if same_filesystem(self.incoming_dname, archive_dname):
+                    os.link(incoming_fname, archive_fname)
+                else:
+                    shutil.copy(incoming_fname, archive_fname)
+            except Exception as e:
+                warn("Failed to create %s: %s" % (archive_fname, str(e)))
         os.unlink(incoming_fname)
 
-def do_spool(incoming_dname, active_dname, archive_dnames=[], cmd_tmpl=None):
-    jobs = dict()
-    try:
-        limit = int(os.getenv("SPOOLDO_JOBS"))
-        if limit < 1:
-            limit = 1
-    except:
-        limit = 1
-    try:
-        for incoming_fname in dirwalk(incoming_dname):
-            rel_fname = os.path.relpath(incoming_fname, incoming_dname)
-            fname = rel_fname.replace(os.path.sep, '--')
-            active_fname = os.path.join(active_dname, fname)
-
+    def start_job(self, incoming_fname, active_fname):
+        pid = os.fork()
+        if pid == 0:
             try:
-                if os.path.isfile(active_fname):
-                    continue
-                os.link(incoming_fname, active_fname)
+                self.run_cmd(active_fname)
+                fname = os.path.relpath(active_fname, self.active_dname)
+                self.archive_incoming(incoming_fname, fname)
             except:
-                warn('unable to link %s to %s' % (incoming_fname, active_fname))
+                sys.exit(1)
+            sys.exit(0)
+        elif pid < 0:
+            error("os.fork() failed")
+        else:
+            self.active_files.add(active_fname)
+            self.active_files_by_pid[pid] = active_fname
+
+    def njobs(self):
+        return len(self.active_files_by_pid)
+
+    def wait(self, block=True):
+        flags = os.WNOHANG
+        if block:
+            flags = 0
+        (pid, status) = os.waitpid(-1, flags)
+        if pid in self.active_files_by_pid:
+            active_fname = self.active_files_by_pid[pid]
+            self.active_files.remove(active_fname)
+            del self.active_files_by_pid[pid]
+        return pid > 0
+
+    def do_spool(self):
+        for incoming_fname in dirwalk(self.incoming_dname):
+            rel_fname = os.path.relpath(incoming_fname, self.incoming_dname)
+            fname = rel_fname.replace(os.path.sep, '--')
+            active_fname = os.path.join(self.active_dname, fname)
+
+            if active_fname in self.active_files:
                 continue
 
-            if cmd_tmpl:
-                pid = start_job(CommandTemplate(cmd_tmpl).substitute(fname=active_fname))
-                jobs[pid] = (incoming_fname, active_fname, fname, archive_dnames)
-                if len(jobs) == limit:
-                        waitproc(jobs)
+            try:
+                os.link(incoming_fname, active_fname)
+            except Exception as e:
+                warn('unable to link %s to %s: %s' % (incoming_fname, active_fname, str(e)))
+                continue
+
+            if self.cmd_tmpl:
+                if self.max_jobs == 1:
+                    self.run_cmd(active_fname)
+                    self.archive_incoming(incoming_fname, fname)
+                else:
+                    self.start_job(incoming_fname, active_fname)
+                    if self.njobs() == self.max_jobs:
+                        self.wait(block=True)
+
             else:
-                archive_incoming(incoming_fname, fname, archive_dnames)
-    finally:
-        while len(jobs) > 0:
-            waitproc(jobs)
+                self.archive_incoming(incoming_fname, fname)
+
+        while self.njobs() > 0 and self.wait(block=False):
+            pass
 
 def warn(msg):
     sys.stderr.write('spooldo: warning: %s\n' % msg)
@@ -139,13 +182,15 @@ def main(incoming_dname, active_dname, archive_dnames=[]):
     if os.path.samefile(incoming_dname, active_dname):
         error('incoming directory and active directory are the same.')
 
-    cmd_tmpl = os.getenv('SPOOLDO_COMMAND_TEMPLATE')
+    spooldo = Spooldo(incoming_dname, active_dname, *archive_dnames)
 
     while True:
         try:
-            do_spool(incoming_dname, active_dname, archive_dnames, cmd_tmpl)
-        except:
+            spooldo.do_spool()
+        except Exception:
             pass
+        except SystemExit:
+            raise
         time.sleep(1)
 
 if __name__ == '__main__':
