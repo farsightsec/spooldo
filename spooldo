@@ -121,6 +121,10 @@ class Spooldo:
 
     def do_spool(self):
         for incoming_fname in dirwalk(self.incoming_dname):
+            if os.path.getsize(incoming_fname) == 0:
+                os.unlink(incoming_fname)
+                continue
+
             rel_fname = os.path.relpath(incoming_fname, self.incoming_dname)
             fname = rel_fname.replace(os.path.sep, '--')
             active_fname = os.path.join(self.active_dname, fname)
